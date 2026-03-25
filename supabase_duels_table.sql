@@ -4,7 +4,7 @@ CREATE TABLE duels (
   city TEXT NOT NULL,
   lang TEXT NOT NULL DEFAULT 'en',
   challenger_name TEXT NOT NULL,
-  question_ids UUID[] NOT NULL,
+  question_ids BIGINT[] NOT NULL,
   challenger_score INTEGER NOT NULL,
   challenger_correct INTEGER NOT NULL,
   challenger_total INTEGER NOT NULL,
