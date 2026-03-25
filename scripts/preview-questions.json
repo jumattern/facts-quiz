@@ -1,0 +1,62 @@
+[
+  {
+    "id": 6023,
+    "question": "Which city is associated with Conrad Gessner, a famous naturalist?",
+    "answers": [
+      "Zurich",
+      "Geneva",
+      "Basel",
+      "Bern"
+    ],
+    "correct": 0,
+    "difficulty": 1
+  },
+  {
+    "id": 6024,
+    "question": "What kind of product did Andreas Stihl invent?",
+    "answers": [
+      "Electric car",
+      "Chainsaw",
+      "Robot",
+      "Computer"
+    ],
+    "correct": 1,
+    "difficulty": 1
+  },
+  {
+    "id": 6025,
+    "question": "Where is James Joyce buried?",
+    "answers": [
+      "Dublin",
+      "London",
+      "Zurich",
+      "Paris"
+    ],
+    "correct": 2,
+    "difficulty": 1
+  },
+  {
+    "id": 6026,
+    "question": "What category of figures is Zurich a haven for?",
+    "answers": [
+      "Musicians",
+      "Athletes",
+      "Literary figures",
+      "Politicians"
+    ],
+    "correct": 2,
+    "difficulty": 1
+  },
+  {
+    "id": 6027,
+    "question": "What was Hans Asper's profession?",
+    "answers": [
+      "Writer",
+      "Painter",
+      "Musician",
+      "Actor"
+    ],
+    "correct": 1,
+    "difficulty": 1
+  }
+]
