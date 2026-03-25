@@ -2,17 +2,10 @@ import { useEffect, useState } from 'react';
 import { getCities } from '../supabase';
 import Leaderboard from './Leaderboard';
 
-const CITY_IMAGES = {
-  Zurich: 'https://images.unsplash.com/photo-1515488764276-beab7607c1e6?w=600&h=400&fit=crop',
-  Bern: 'https://images.unsplash.com/photo-1741900033774-5957b5f03dd7?w=600&h=400&fit=crop',
-  Basel: 'https://images.unsplash.com/photo-1627410566847-738061cb6995?w=600&h=400&fit=crop',
-  Lucerne: 'https://images.unsplash.com/photo-1749195403421-b40b0ff3cae7?w=600&h=400&fit=crop',
-  Geneva: 'https://images.unsplash.com/photo-1757584666096-59deb41f1124?w=600&h=400&fit=crop',
-  Lausanne: 'https://images.unsplash.com/photo-1603646049799-736bb072cec5?w=600&h=400&fit=crop',
-};
-
-function getDefaultImage(city) {
-  return CITY_IMAGES[city] || `https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=600&h=400&fit=crop`;
+function getCityImageUrl(city, country) {
+  // Use Unsplash source for a city-specific photo
+  const query = encodeURIComponent(`${city} ${country} city`);
+  return `https://source.unsplash.com/600x400/?${query}`;
 }
 
 export default function CitySelect({ onSelectCity, lang }) {
@@ -77,7 +70,7 @@ export default function CitySelect({ onSelectCity, lang }) {
           >
             <div
               className="city-card-bg"
-              style={{ backgroundImage: `url(${getDefaultImage(c.city)})` }}
+              style={{ backgroundImage: `url(${getCityImageUrl(c.city, c.country)})` }}
             />
             <div className="city-card-overlay" />
             <div className="city-card-content">
