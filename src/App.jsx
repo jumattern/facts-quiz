@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import CitySelect from './components/CitySelect';
 import Quiz from './components/Quiz';
+import Background from './components/Background';
 import './App.css';
 
 const LANGS = [
@@ -16,8 +17,16 @@ function App() {
 
   return (
     <div className="app">
+      <Background />
+      <div className="gradient-orbs">
+        <div className="orb orb-1" />
+        <div className="orb orb-2" />
+        <div className="orb orb-3" />
+      </div>
+
       <nav className="top-nav">
         <span className="logo" onClick={() => setSelectedCity(null)}>
+          <span className="logo-icon">&#x2728;</span>
           City Facts Quiz
         </span>
         <div className="lang-switcher">
