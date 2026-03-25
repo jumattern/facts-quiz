@@ -3,6 +3,7 @@ import Confetti from './Confetti';
 import Leaderboard from './Leaderboard';
 import { playComplete } from '../sounds';
 import { submitScore, getPlayerRank, createDuel } from '../supabase';
+import { t } from '../i18n';
 
 export default function Results({
   city,
@@ -75,7 +76,7 @@ export default function Results({
   };
 
   const handleChallenge = async () => {
-    const name = playerName.trim() || 'Anonymous';
+    const name = playerName.trim() || t(lang, 'anonymous');
     setCreatingDuel(true);
     setDuelError(null);
     try {
@@ -125,19 +126,19 @@ export default function Results({
   let emoji, message;
   if (pct === 100) {
     emoji = '\u{1F3C6}';
-    message = `Flawless! You're the ultimate ${city} expert!`;
+    message = t(lang, 'flawless')(city);
   } else if (pct >= 80) {
     emoji = '\u{1F389}';
-    message = `Amazing! You really know ${city}!`;
+    message = t(lang, 'amazing')(city);
   } else if (pct >= 60) {
     emoji = '\u{1F44F}';
-    message = `Well played! ${city} is starting to reveal its secrets.`;
+    message = t(lang, 'wellPlayed')(city);
   } else if (pct >= 40) {
     emoji = '\u{1F914}';
-    message = `Not bad! ${city} still has surprises for you.`;
+    message = t(lang, 'notBad')(city);
   } else {
     emoji = '\u{1F4DA}';
-    message = `Time to explore ${city} a bit more!`;
+    message = t(lang, 'explore')(city);
   }
 
   return (
@@ -147,6 +148,7 @@ export default function Results({
       {showLeaderboard && (
         <Leaderboard
           city={city}
+          lang={lang}
           onClose={() => setShowLeaderboard(false)}
           highlightId={submittedId}
         />
@@ -154,12 +156,12 @@ export default function Results({
 
       <div className="results-card">
         <div className="results-emoji">{emoji}</div>
-        <h2 className="results-title">{city} Quiz Complete</h2>
+        <h2 className="results-title">{t(lang, 'quizComplete')(city)}</h2>
 
         <div className="results-stats">
           <div className="stat-box">
             <div className="stat-value">{totalPoints}</div>
-            <div className="stat-label">Points</div>
+            <div className="stat-label">{t(lang, 'points')}</div>
           </div>
           <div className="stat-box stat-main">
             <div className="score-ring">
@@ -194,14 +196,14 @@ export default function Results({
               <span className="score-number">{pct}%</span>
             </div>
             <div className="stat-label">
-              {correct}/{total} correct
+              {correct}/{total} {t(lang, 'correct')}
             </div>
           </div>
           <div className="stat-box">
             <div className="stat-value">
               {bestStreak > 0 ? `${bestStreak}x` : '-'}
             </div>
-            <div className="stat-label">Best Streak</div>
+            <div className="stat-label">{t(lang, 'bestStreak')}</div>
           </div>
         </div>
 
@@ -210,12 +212,12 @@ export default function Results({
         {/* Score submission */}
         {!submitted ? (
           <form className="score-submit" onSubmit={handleSubmit}>
-            <p className="score-submit-label">Save your score to the leaderboard</p>
+            <p className="score-submit-label">{t(lang, 'saveScore')}</p>
             <div className="score-submit-row">
               <input
                 type="text"
                 className="name-input"
-                placeholder="Your name..."
+                placeholder={t(lang, 'yourName')}
                 value={playerName}
                 onChange={(e) => setPlayerName(e.target.value)}
                 maxLength={30}
@@ -226,7 +228,7 @@ export default function Results({
                 className="btn btn-primary btn-submit"
                 disabled={!playerName.trim() || submitting}
               >
-                {submitting ? 'Saving...' : 'Submit'}
+                {submitting ? t(lang, 'saving') : t(lang, 'submit')}
               </button>
             </div>
             {submitError && (
@@ -236,10 +238,10 @@ export default function Results({
         ) : (
           <div className="score-submitted animate-in">
             <p className="submitted-text">
-              &#x2705; Score saved!
+              &#x2705; {t(lang, 'scoreSaved')}
               {rank && (
                 <span className="rank-text">
-                  {' '}You're <strong>#{rank}</strong> in {city}!
+                  {' '}{t(lang, 'yourRank')(rank, city)}
                 </span>
               )}
             </p>
@@ -247,13 +249,13 @@ export default function Results({
               className="btn btn-leaderboard"
               onClick={() => setShowLeaderboard(true)}
             >
-              &#x1F3C6; View Leaderboard
+              &#x1F3C6; {t(lang, 'viewLeaderboard')}
             </button>
           </div>
         )}
 
         <div className="results-breakdown">
-          <h3>Question Breakdown</h3>
+          <h3>{t(lang, 'questionBreakdown')}</h3>
           {questions.map((q, i) => {
             const answer = answers[i];
             return (
@@ -281,17 +283,17 @@ export default function Results({
               onClick={handleChallenge}
               disabled={creatingDuel}
             >
-              {creatingDuel ? 'Creating...' : '\u2694\uFE0F Challenge a Friend'}
+              {creatingDuel ? t(lang, 'creating') : `\u2694\uFE0F ${t(lang, 'challengeFriend')}`}
             </button>
             {duelError && (
               <p className="submit-error" style={{ marginTop: '10px' }}>
-                Failed to create duel: {duelError}
+                {t(lang, 'duelFailed')} {duelError}
               </p>
             )}
           </div>
         ) : (
           <div className="duel-link-section animate-in">
-            <p className="duel-link-label">Share this link with a friend:</p>
+            <p className="duel-link-label">{t(lang, 'shareLink')}</p>
             <div className="duel-link-row">
               <input
                 type="text"
@@ -301,27 +303,27 @@ export default function Results({
                 onClick={(e) => e.target.select()}
               />
               <button className="btn btn-primary btn-copy" onClick={handleCopyLink}>
-                {duelCopied ? '\u2705 Copied!' : '\u{1F4CB} Copy'}
+                {duelCopied ? `\u2705 ${t(lang, 'copied')}` : `\u{1F4CB} ${t(lang, 'copy')}`}
               </button>
             </div>
             <p className="duel-link-hint">
-              They'll answer the same questions, then see a head-to-head comparison!
+              {t(lang, 'shareLinkHint')}
             </p>
           </div>
         )}
 
         <div className="results-actions">
           <button className="btn btn-primary" onClick={onRetry}>
-            &#x1F504; Play Again
+            &#x1F504; {t(lang, 'playAgain')}
           </button>
           <button
             className="btn btn-secondary"
             onClick={() => setShowLeaderboard(true)}
           >
-            &#x1F3C6; Leaderboard
+            &#x1F3C6; {t(lang, 'leaderboard')}
           </button>
           <button className="btn btn-secondary" onClick={onBack}>
-            &#x1F30D; Other Cities
+            &#x1F30D; {t(lang, 'otherCities')}
           </button>
         </div>
       </div>

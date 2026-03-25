@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { t } from '../i18n';
 
 const CATEGORY_COLORS = {
   dark: '#6b21a8',
@@ -8,18 +9,10 @@ const CATEGORY_COLORS = {
   weird: '#db2777',
 };
 
-const CATEGORY_LABELS = {
-  dark: 'Dark',
-  funny: 'Funny',
-  hidden: 'Hidden Gem',
-  legendary: 'Legendary',
-  weird: 'Weird',
-};
-
 const ANSWER_LETTERS = ['A', 'B', 'C', 'D'];
 const TIMER_SECONDS = 20;
 
-export default function QuizCard({ question, onAnswer, onNext, questionNumber, streak, isLast }) {
+export default function QuizCard({ question, lang, onAnswer, onNext, questionNumber, streak, isLast }) {
   const [selected, setSelected] = useState(null);
   const [revealed, setRevealed] = useState(false);
   const [timeLeft, setTimeLeft] = useState(TIMER_SECONDS);
@@ -60,6 +53,7 @@ export default function QuizCard({ question, onAnswer, onNext, questionNumber, s
   };
 
   const categoryColor = CATEGORY_COLORS[question.category] || '#6366f1';
+  const categoryLabels = t(lang, 'categoryLabels');
   const timerPct = (timeLeft / TIMER_SECONDS) * 100;
   const timerUrgent = timeLeft <= 5;
 
@@ -81,7 +75,7 @@ export default function QuizCard({ question, onAnswer, onNext, questionNumber, s
                 className="category-badge"
                 style={{ backgroundColor: categoryColor }}
               >
-                {CATEGORY_LABELS[question.category] || question.category}
+                {categoryLabels?.[question.category] || question.category}
               </span>
             )}
             {question.year && <span className="year-badge">{question.year}</span>}
@@ -96,7 +90,7 @@ export default function QuizCard({ question, onAnswer, onNext, questionNumber, s
         {streak >= 3 && !revealed && (
           <div className="streak-badge animate-in">
             <span className="streak-fire">&#x1F525;</span>
-            {streak} streak!
+            {t(lang, 'streak')(streak)}
           </div>
         )}
 
@@ -129,12 +123,12 @@ export default function QuizCard({ question, onAnswer, onNext, questionNumber, s
         {revealed && (
           <div className="quiz-fact animate-in">
             {selected === -1 && (
-              <p className="timeout-label">Time's up!</p>
+              <p className="timeout-label">{t(lang, 'timesUp')}</p>
             )}
-            <p className="fact-label">Did you know?</p>
+            <p className="fact-label">{t(lang, 'didYouKnow')}</p>
             <p className="fact-text">{question.fact}</p>
             <button className="btn btn-next" onClick={onNext}>
-              {isLast ? 'See Results' : 'Next Question'} &rarr;
+              {isLast ? t(lang, 'seeResults') : t(lang, 'nextQuestion')} &rarr;
             </button>
           </div>
         )}

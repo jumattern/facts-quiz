@@ -1,21 +1,22 @@
 import { useEffect, useState } from 'react';
 import { getLeaderboard } from '../supabase';
+import { t } from '../i18n';
 
 const MEDAL = ['\u{1F947}', '\u{1F948}', '\u{1F949}'];
 
-function timeAgo(dateStr) {
+function timeAgo(dateStr, lang) {
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return t(lang, 'timeJustNow');
+  if (mins < 60) return t(lang, 'timeMinutes')(mins);
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
+  if (hrs < 24) return t(lang, 'timeHours')(hrs);
   const days = Math.floor(hrs / 24);
-  if (days < 7) return `${days}d ago`;
+  if (days < 7) return t(lang, 'timeDays')(days);
   return new Date(dateStr).toLocaleDateString();
 }
 
-export default function Leaderboard({ city, onClose, highlightId }) {
+export default function Leaderboard({ city, lang, onClose, highlightId }) {
   const [scores, setScores] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState(city ? 'city' : 'global');
@@ -32,7 +33,7 @@ export default function Leaderboard({ city, onClose, highlightId }) {
     <div className="leaderboard-overlay" onClick={onClose}>
       <div className="leaderboard-modal animate-in" onClick={(e) => e.stopPropagation()}>
         <div className="leaderboard-header">
-          <h2>&#x1F3C6; Leaderboard</h2>
+          <h2>&#x1F3C6; {t(lang, 'leaderboard')}</h2>
           <button className="lb-close" onClick={onClose}>&#x2715;</button>
         </div>
 
@@ -48,7 +49,7 @@ export default function Leaderboard({ city, onClose, highlightId }) {
               className={`lb-tab ${tab === 'global' ? 'active' : ''}`}
               onClick={() => setTab('global')}
             >
-              All Cities
+              {t(lang, 'allCities')}
             </button>
           </div>
         )}
@@ -59,7 +60,7 @@ export default function Leaderboard({ city, onClose, highlightId }) {
           </div>
         ) : scores.length === 0 ? (
           <div className="lb-empty">
-            <p>No scores yet. Be the first!</p>
+            <p>{t(lang, 'noScores')}</p>
           </div>
         ) : (
           <div className="lb-list">
@@ -78,13 +79,13 @@ export default function Leaderboard({ city, onClose, highlightId }) {
                   )}
                 </div>
                 <div className="lb-stats">
-                  <span className="lb-score">{s.score} pts</span>
+                  <span className="lb-score">{s.score} {t(lang, 'pts')}</span>
                   <span className="lb-detail">
                     {s.correct}/{s.total}
                     {s.best_streak > 0 && ` \u{1F525}${s.best_streak}`}
                   </span>
                 </div>
-                <span className="lb-time">{timeAgo(s.created_at)}</span>
+                <span className="lb-time">{timeAgo(s.created_at, lang)}</span>
               </div>
             ))}
           </div>

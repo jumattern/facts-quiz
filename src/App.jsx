@@ -3,6 +3,7 @@ import CitySelect from './components/CitySelect';
 import Quiz from './components/Quiz';
 import Background from './components/Background';
 import { getDuel } from './supabase';
+import { t } from './i18n';
 import './App.css';
 
 const LANGS = [
@@ -28,14 +29,14 @@ function App() {
       getDuel(duelId)
         .then((d) => {
           if (d.completed_at) {
-            setDuelError('This duel has already been completed.');
+            setDuelError(t(lang, 'duelAlreadyCompleted'));
           } else {
             setDuel(d);
             setSelectedCity(d.city);
             setLang(d.lang || 'en');
           }
         })
-        .catch(() => setDuelError('Duel not found or link is invalid.'))
+        .catch(() => setDuelError(t(lang, 'duelInvalidLink')))
         .finally(() => setDuelLoading(false));
       // Clean URL
       window.history.replaceState({}, '', window.location.pathname);
@@ -60,7 +61,7 @@ function App() {
       <nav className="top-nav">
         <span className="logo" onClick={handleBack}>
           <span className="logo-icon">&#x2728;</span>
-          City Facts Quiz
+          {t(lang, 'appTitle')}
         </span>
         <div className="lang-switcher">
           {LANGS.map((l) => (
@@ -79,13 +80,13 @@ function App() {
         {duelLoading ? (
           <div className="quiz-loading">
             <div className="loader" />
-            <p>Loading duel challenge...</p>
+            <p>{t(lang, 'loadingDuel')}</p>
           </div>
         ) : duelError ? (
           <div className="quiz-error">
             <p>{duelError}</p>
             <button className="btn btn-primary" onClick={handleBack}>
-              Back to Cities
+              {t(lang, 'backToCities')}
             </button>
           </div>
         ) : selectedCity ? (

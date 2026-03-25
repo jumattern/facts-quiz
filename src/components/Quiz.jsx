@@ -4,16 +4,17 @@ import QuizCard from './QuizCard';
 import Results from './Results';
 import DuelResults from './DuelResults';
 import { playCorrect, playWrong, playStreak } from '../sounds';
+import { t } from '../i18n';
 
 const BASE_POINTS = 100;
-const SPEED_BONUS_MAX = 100; // max bonus for fast answer
+const SPEED_BONUS_MAX = 100;
 const TIMER_SECONDS = 20;
 
 function calcPoints(isCorrect, elapsed, streak) {
   if (!isCorrect) return 0;
   const speedRatio = Math.max(0, 1 - elapsed / TIMER_SECONDS);
   const speedBonus = Math.round(speedRatio * SPEED_BONUS_MAX);
-  const streakMultiplier = 1 + Math.min(streak, 10) * 0.1; // up to 2x at 10 streak
+  const streakMultiplier = 1 + Math.min(streak, 10) * 0.1;
   return Math.round((BASE_POINTS + speedBonus) * streakMultiplier);
 }
 
@@ -37,8 +38,9 @@ export default function Quiz({ city, lang, onBack, duel }) {
 
   useEffect(() => {
     setLoading(true);
+    setError(null);
+
     if (duel) {
-      // Duel mode: fetch the exact questions in order
       getQuizQuestionsByIds(duel.question_ids, lang)
         .then((qs) => setQuestions(qs))
         .catch((err) => setError(err.message))
@@ -89,6 +91,7 @@ export default function Quiz({ city, lang, onBack, duel }) {
   const handleNext = useCallback(() => {
     if (!waitingForNext) return;
     setWaitingForNext(false);
+
     if (current + 1 < questions.length) {
       setTransition(true);
       setTimeout(() => {
@@ -98,13 +101,17 @@ export default function Quiz({ city, lang, onBack, duel }) {
     } else {
       setQuizDone(true);
     }
-  }, [waitingForNext, current, questions]);
+  }, [waitingForNext, current, questions.length]);
 
   if (loading) {
     return (
       <div className="quiz-loading">
         <div className="loader" />
-        <p>{duel ? `Loading ${duel.challenger_name}'s challenge...` : `Loading ${city} quiz...`}</p>
+        <p>
+          {duel
+            ? t(lang, 'loadingChallenge')(duel.challenger_name)
+            : t(lang, 'loadingQuiz')(city)}
+        </p>
       </div>
     );
   }
@@ -112,9 +119,9 @@ export default function Quiz({ city, lang, onBack, duel }) {
   if (error) {
     return (
       <div className="quiz-error">
-        <p>Error: {error}</p>
+        <p>{t(lang, 'error')} {error}</p>
         <button className="btn" onClick={onBack}>
-          Back to cities
+          {t(lang, 'backCities')}
         </button>
       </div>
     );
@@ -123,24 +130,22 @@ export default function Quiz({ city, lang, onBack, duel }) {
   if (questions.length === 0) {
     return (
       <div className="quiz-error">
-        <p>No quiz questions found for {city}.</p>
+        <p>{t(lang, 'noQuestions')(city)}</p>
         <button className="btn" onClick={onBack}>
-          Back to cities
+          {t(lang, 'backCities')}
         </button>
       </div>
     );
   }
 
-  // Duel intro screen — enter name before starting
   if (duel && !duelStarted) {
     return (
       <div className="results animate-in">
         <div className="results-card">
           <div className="results-emoji">{'\u2694\uFE0F'}</div>
-          <h2 className="results-title">Duel Challenge!</h2>
+          <h2 className="results-title">{t(lang, 'duelChallenge')}</h2>
           <p className="results-message">
-            <strong>{duel.challenger_name}</strong> challenged you to a {city} quiz duel!
-            Answer the same {duel.challenger_total} questions and see who knows more.
+            {t(lang, 'duelIntro')(duel.challenger_name, city, duel.challenger_total)}
           </p>
           <form
             className="score-submit"
@@ -152,12 +157,12 @@ export default function Quiz({ city, lang, onBack, duel }) {
               setDuelStarted(true);
             }}
           >
-            <p className="score-submit-label">Enter your name to begin</p>
+            <p className="score-submit-label">{t(lang, 'enterName')}</p>
             <div className="score-submit-row">
               <input
                 type="text"
                 className="name-input"
-                placeholder="Your name..."
+                placeholder={t(lang, 'yourName')}
                 value={duelPlayerName}
                 onChange={(e) => setDuelPlayerName(e.target.value)}
                 maxLength={30}
@@ -169,7 +174,7 @@ export default function Quiz({ city, lang, onBack, duel }) {
                 disabled={!duelPlayerName.trim()}
                 style={{ padding: '12px 24px' }}
               >
-                Start Duel
+                {t(lang, 'startDuel')}
               </button>
             </div>
           </form>
@@ -179,9 +184,12 @@ export default function Quiz({ city, lang, onBack, duel }) {
   }
 
   if (quizDone) {
-    // If this was a duel, submit opponent results and show comparison
     if (duel && !completedDuel) {
-      const opponentName = duelPlayerName.trim() || localStorage.getItem('quizPlayerName') || 'Challenger';
+      const opponentName =
+        duelPlayerName.trim() ||
+        localStorage.getItem('quizPlayerName') ||
+        t(lang, 'challengerFallback');
+
       const bestStreakVal = answers.reduce(
         (acc, a) => {
           const cur = a.isCorrect ? acc.cur + 1 : 0;
@@ -204,7 +212,6 @@ export default function Quiz({ city, lang, onBack, duel }) {
       })
         .then((d) => setCompletedDuel(d))
         .catch(() => {
-          // Even if save fails, show comparison with local data
           setCompletedDuel({
             ...duel,
             opponent_name: opponentName,
@@ -223,7 +230,7 @@ export default function Quiz({ city, lang, onBack, duel }) {
       return (
         <div className="quiz-loading">
           <div className="loader" />
-          <p>Comparing results...</p>
+          <p>{t(lang, 'comparingResults')}</p>
         </div>
       );
     }
@@ -232,6 +239,7 @@ export default function Quiz({ city, lang, onBack, duel }) {
       return (
         <DuelResults
           duel={completedDuel}
+          lang={lang}
           onBack={() => {
             setCurrent(0);
             setAnswers([]);
@@ -273,7 +281,7 @@ export default function Quiz({ city, lang, onBack, duel }) {
     <div className="quiz-container">
       <div className="quiz-header">
         <button className="btn-back" onClick={onBack}>
-          &larr; Cities
+          &larr; {t(lang, 'backCities')}
         </button>
         <h2 className="quiz-city-title">{city}</h2>
         <div className="quiz-progress">
@@ -293,7 +301,7 @@ export default function Quiz({ city, lang, onBack, duel }) {
 
       <div className="quiz-score-bar">
         <div className="score-left">
-          <span className="score-points">&#x2B50; {totalPoints} pts</span>
+          <span className="score-points">&#x2B50; {totalPoints} {t(lang, 'pts')}</span>
           {streak >= 2 && (
             <span className="streak-indicator">
               &#x1F525; {streak}x
@@ -316,6 +324,7 @@ export default function Quiz({ city, lang, onBack, duel }) {
         <QuizCard
           key={q.id}
           question={q}
+          lang={lang}
           onAnswer={handleAnswer}
           onNext={handleNext}
           questionNumber={current + 1}
