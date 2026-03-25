@@ -40,7 +40,7 @@ export async function getCities() {
     .sort((a, b) => b.count - a.count);
 }
 
-export async function getQuizQuestions(city, lang = 'en', limit = 10) {
+export async function getQuizQuestions(city, lang = 'en', limit = 5) {
   const langSuffix = lang === 'en' ? 'en' : lang;
   const questionCol = `quiz_question_${langSuffix}`;
   const answerACol = `quiz_answer_a_${langSuffix}`;
@@ -48,7 +48,8 @@ export async function getQuizQuestions(city, lang = 'en', limit = 10) {
   const answerCCol = `quiz_answer_c_${langSuffix}`;
   const answerDCol = `quiz_answer_d_${langSuffix}`;
 
-  const { data, error } = await supabase
+  // Try easy questions first (difficulty <= 3)
+  let { data, error } = await supabase
     .from('facts')
     .select(
       `id, city, country, category, title, title_de, title_fr, title_it,
@@ -60,10 +61,32 @@ export async function getQuizQuestions(city, lang = 'en', limit = 10) {
     .eq('city', city)
     .not(questionCol, 'is', null)
     .not('quiz_correct_answer', 'is', null)
+    .lte('quiz_difficulty', 3)
     .order('juiciness', { ascending: false })
     .limit(limit);
 
   if (error) throw error;
+
+  // Fallback: if not enough easy questions, fetch all difficulties
+  if (data.length < limit) {
+    const fallback = await supabase
+      .from('facts')
+      .select(
+        `id, city, country, category, title, title_de, title_fr, title_it,
+         fact_text, fact_text_de, fact_text_fr, fact_text_it,
+         image_url, year, juiciness, quiz_difficulty,
+         ${questionCol}, ${answerACol}, ${answerBCol}, ${answerCCol}, ${answerDCol},
+         quiz_correct_answer`
+      )
+      .eq('city', city)
+      .not(questionCol, 'is', null)
+      .not('quiz_correct_answer', 'is', null)
+      .order('quiz_difficulty', { ascending: true })
+      .order('juiciness', { ascending: false })
+      .limit(limit);
+
+    if (!fallback.error) data = fallback.data;
+  }
 
   return data.map((row) => ({
     id: row.id,

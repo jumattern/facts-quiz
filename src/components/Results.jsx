@@ -24,6 +24,7 @@ export default function Results({
   const [duelLink, setDuelLink] = useState(null);
   const [creatingDuel, setCreatingDuel] = useState(false);
   const [duelCopied, setDuelCopied] = useState(false);
+  const [duelError, setDuelError] = useState(null);
 
   const correct = answers.filter((a) => a.isCorrect).length;
   const total = questions.length;
@@ -76,6 +77,7 @@ export default function Results({
   const handleChallenge = async () => {
     const name = playerName.trim() || 'Anonymous';
     setCreatingDuel(true);
+    setDuelError(null);
     try {
       const duel = await createDuel({
         city,
@@ -95,7 +97,8 @@ export default function Results({
       const url = `${window.location.origin}${window.location.pathname}?duel=${duel.id}`;
       setDuelLink(url);
     } catch (err) {
-      setSubmitError(err.message);
+      console.error('Duel creation failed:', err);
+      setDuelError(err.message);
     } finally {
       setCreatingDuel(false);
     }
@@ -280,6 +283,11 @@ export default function Results({
             >
               {creatingDuel ? 'Creating...' : '\u2694\uFE0F Challenge a Friend'}
             </button>
+            {duelError && (
+              <p className="submit-error" style={{ marginTop: '10px' }}>
+                Failed to create duel: {duelError}
+              </p>
+            )}
           </div>
         ) : (
           <div className="duel-link-section animate-in">
