@@ -1,19 +1,12 @@
 import { useEffect, useState } from 'react';
 import { getCities } from '../supabase';
-
-const CATEGORY_EMOJI = {
-  dark: '\u{1F480}',
-  funny: '\u{1F602}',
-  hidden: '\u{1F50D}',
-  legendary: '\u{1F451}',
-  weird: '\u{1F47D}',
-};
+import Leaderboard from './Leaderboard';
 
 const CITY_IMAGES = {
-  Zürich: 'https://images.unsplash.com/photo-1515488764276-beab7607c1e6?w=400&h=250&fit=crop',
+  Zurich: 'https://images.unsplash.com/photo-1515488764276-beab7607c1e6?w=400&h=250&fit=crop',
   Bern: 'https://images.unsplash.com/photo-1587974928442-77dc3e0dba72?w=400&h=250&fit=crop',
   Basel: 'https://images.unsplash.com/photo-1549877452-d6e99849e5a0?w=400&h=250&fit=crop',
-  Luzern: 'https://images.unsplash.com/photo-1527668752968-14dc70a27c95?w=400&h=250&fit=crop',
+  Lucerne: 'https://images.unsplash.com/photo-1527668752968-14dc70a27c95?w=400&h=250&fit=crop',
   Geneva: 'https://images.unsplash.com/photo-1573108037329-37aa135a142e?w=400&h=250&fit=crop',
   Lausanne: 'https://images.unsplash.com/photo-1559128010-7c1ad6e1b6a5?w=400&h=250&fit=crop',
 };
@@ -26,6 +19,7 @@ export default function CitySelect({ onSelectCity, lang }) {
   const [cities, setCities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
 
   useEffect(() => {
     getCities()
@@ -54,11 +48,24 @@ export default function CitySelect({ onSelectCity, lang }) {
 
   return (
     <div className="city-select">
+      {showLeaderboard && (
+        <Leaderboard
+          city={null}
+          onClose={() => setShowLeaderboard(false)}
+        />
+      )}
+
       <header className="hero">
         <h1>City Facts Quiz</h1>
         <p className="subtitle">
           Pick a city and test your knowledge about its most surprising facts
         </p>
+        <button
+          className="btn btn-leaderboard hero-lb-btn"
+          onClick={() => setShowLeaderboard(true)}
+        >
+          &#x1F3C6; Leaderboard
+        </button>
       </header>
 
       <div className="city-grid">

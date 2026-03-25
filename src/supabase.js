@@ -6,22 +6,33 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export async function getCities() {
-  const { data, error } = await supabase
-    .from('facts')
-    .select('city, country')
-    .not('quiz_question_en', 'is', null)
-    .not('quiz_correct_answer', 'is', null);
-
-  if (error) throw error;
-
+  // Paginate to get all rows — Supabase defaults to max 1000
   const cityMap = new Map();
-  for (const row of data) {
-    const key = `${row.city}, ${row.country}`;
-    cityMap.set(key, {
-      city: row.city,
-      country: row.country,
-      count: (cityMap.get(key)?.count || 0) + 1,
-    });
+  let from = 0;
+  const pageSize = 1000;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from('facts')
+      .select('city, country')
+      .not('quiz_question_en', 'is', null)
+      .not('quiz_correct_answer', 'is', null)
+      .range(from, from + pageSize - 1);
+
+    if (error) throw error;
+    if (!data.length) break;
+
+    for (const row of data) {
+      const key = `${row.city}, ${row.country}`;
+      cityMap.set(key, {
+        city: row.city,
+        country: row.country,
+        count: (cityMap.get(key)?.count || 0) + 1,
+      });
+    }
+
+    if (data.length < pageSize) break;
+    from += pageSize;
   }
 
   return Array.from(cityMap.values())
@@ -74,4 +85,49 @@ export async function getQuizQuestions(city, lang = 'en', limit = 10) {
     ],
     correctAnswer: row.quiz_correct_answer,
   }));
+}
+
+// ── Leaderboard ──────────────────────────────────────────────────────
+
+export async function submitScore({ playerName, city, score, correct, total, bestStreak }) {
+  const { data, error } = await supabase
+    .from('leaderboard')
+    .insert({
+      player_name: playerName.trim().slice(0, 30),
+      city,
+      score,
+      correct,
+      total,
+      best_streak: bestStreak,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function getLeaderboard(city, limit = 20) {
+  const query = supabase
+    .from('leaderboard')
+    .select('*')
+    .order('score', { ascending: false })
+    .limit(limit);
+
+  if (city) query.eq('city', city);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data;
+}
+
+export async function getPlayerRank(city, score) {
+  const { count, error } = await supabase
+    .from('leaderboard')
+    .select('*', { count: 'exact', head: true })
+    .eq('city', city)
+    .gt('score', score);
+
+  if (error) return null;
+  return (count || 0) + 1;
 }

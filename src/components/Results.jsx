@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import Confetti from './Confetti';
+import Leaderboard from './Leaderboard';
 import { playComplete } from '../sounds';
+import { submitScore, getPlayerRank } from '../supabase';
 
 export default function Results({
   city,
@@ -11,6 +13,14 @@ export default function Results({
   onRetry,
 }) {
   const [showConfetti, setShowConfetti] = useState(false);
+  const [playerName, setPlayerName] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
+  const [rank, setRank] = useState(null);
+  const [submittedId, setSubmittedId] = useState(null);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+
   const correct = answers.filter((a) => a.isCorrect).length;
   const total = questions.length;
   const pct = Math.round((correct / total) * 100);
@@ -24,10 +34,40 @@ export default function Results({
 
   useEffect(() => {
     playComplete();
-    if (pct >= 70) {
-      setShowConfetti(true);
-    }
+    if (pct >= 70) setShowConfetti(true);
+
+    // Restore last used name
+    const saved = localStorage.getItem('quizPlayerName');
+    if (saved) setPlayerName(saved);
   }, []);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!playerName.trim() || submitting) return;
+
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      localStorage.setItem('quizPlayerName', playerName.trim());
+      const entry = await submitScore({
+        playerName: playerName.trim(),
+        city,
+        score: totalPoints,
+        correct,
+        total,
+        bestStreak,
+      });
+      setSubmittedId(entry.id);
+      setSubmitted(true);
+
+      const r = await getPlayerRank(city, totalPoints);
+      if (r) setRank(r);
+    } catch (err) {
+      setSubmitError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   let emoji, message;
   if (pct === 100) {
@@ -50,6 +90,14 @@ export default function Results({
   return (
     <div className="results animate-in">
       <Confetti active={showConfetti} />
+
+      {showLeaderboard && (
+        <Leaderboard
+          city={city}
+          onClose={() => setShowLeaderboard(false)}
+          highlightId={submittedId}
+        />
+      )}
 
       <div className="results-card">
         <div className="results-emoji">{emoji}</div>
@@ -106,6 +154,51 @@ export default function Results({
 
         <p className="results-message">{message}</p>
 
+        {/* Score submission */}
+        {!submitted ? (
+          <form className="score-submit" onSubmit={handleSubmit}>
+            <p className="score-submit-label">Save your score to the leaderboard</p>
+            <div className="score-submit-row">
+              <input
+                type="text"
+                className="name-input"
+                placeholder="Your name..."
+                value={playerName}
+                onChange={(e) => setPlayerName(e.target.value)}
+                maxLength={30}
+                autoFocus
+              />
+              <button
+                type="submit"
+                className="btn btn-primary btn-submit"
+                disabled={!playerName.trim() || submitting}
+              >
+                {submitting ? 'Saving...' : 'Submit'}
+              </button>
+            </div>
+            {submitError && (
+              <p className="submit-error">{submitError}</p>
+            )}
+          </form>
+        ) : (
+          <div className="score-submitted animate-in">
+            <p className="submitted-text">
+              &#x2705; Score saved!
+              {rank && (
+                <span className="rank-text">
+                  {' '}You're <strong>#{rank}</strong> in {city}!
+                </span>
+              )}
+            </p>
+            <button
+              className="btn btn-leaderboard"
+              onClick={() => setShowLeaderboard(true)}
+            >
+              &#x1F3C6; View Leaderboard
+            </button>
+          </div>
+        )}
+
         <div className="results-breakdown">
           <h3>Question Breakdown</h3>
           {questions.map((q, i) => {
@@ -130,6 +223,12 @@ export default function Results({
         <div className="results-actions">
           <button className="btn btn-primary" onClick={onRetry}>
             &#x1F504; Play Again
+          </button>
+          <button
+            className="btn btn-secondary"
+            onClick={() => setShowLeaderboard(true)}
+          >
+            &#x1F3C6; Leaderboard
           </button>
           <button className="btn btn-secondary" onClick={onBack}>
             &#x1F30D; Other Cities
