@@ -19,7 +19,7 @@ const CATEGORY_LABELS = {
 const ANSWER_LETTERS = ['A', 'B', 'C', 'D'];
 const TIMER_SECONDS = 20;
 
-export default function QuizCard({ question, onAnswer, questionNumber, streak }) {
+export default function QuizCard({ question, onAnswer, onNext, questionNumber, streak, isLast }) {
   const [selected, setSelected] = useState(null);
   const [revealed, setRevealed] = useState(false);
   const [timeLeft, setTimeLeft] = useState(TIMER_SECONDS);
@@ -72,12 +72,6 @@ export default function QuizCard({ question, onAnswer, questionNumber, streak })
           style={{ width: `${timerPct}%` }}
         />
       </div>
-
-      {question.imageUrl && (
-        <div className="quiz-card-image">
-          <img src={question.imageUrl} alt="" loading="lazy" />
-        </div>
-      )}
 
       <div className="quiz-card-body">
         <div className="quiz-card-top-row">
@@ -139,6 +133,9 @@ export default function QuizCard({ question, onAnswer, questionNumber, streak })
             )}
             <p className="fact-label">Did you know?</p>
             <p className="fact-text">{question.fact}</p>
+            <button className="btn btn-next" onClick={onNext}>
+              {isLast ? 'See Results' : 'Next Question'} &rarr;
+            </button>
           </div>
         )}
       </div>

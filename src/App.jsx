@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import CitySelect from './components/CitySelect';
 import Quiz from './components/Quiz';
 import Background from './components/Background';
+import { getDuel } from './supabase';
 import './App.css';
 
 const LANGS = [
@@ -13,7 +14,39 @@ const LANGS = [
 
 function App() {
   const [selectedCity, setSelectedCity] = useState(null);
-  const [lang, setLang] = useState('en');
+  const [lang, setLang] = useState('de');
+  const [duel, setDuel] = useState(null);
+  const [duelLoading, setDuelLoading] = useState(false);
+  const [duelError, setDuelError] = useState(null);
+
+  // Check for duel param on mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const duelId = params.get('duel');
+    if (duelId) {
+      setDuelLoading(true);
+      getDuel(duelId)
+        .then((d) => {
+          if (d.completed_at) {
+            setDuelError('This duel has already been completed.');
+          } else {
+            setDuel(d);
+            setSelectedCity(d.city);
+            setLang(d.lang || 'en');
+          }
+        })
+        .catch(() => setDuelError('Duel not found or link is invalid.'))
+        .finally(() => setDuelLoading(false));
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
+  const handleBack = () => {
+    setSelectedCity(null);
+    setDuel(null);
+    setDuelError(null);
+  };
 
   return (
     <div className="app">
@@ -25,7 +58,7 @@ function App() {
       </div>
 
       <nav className="top-nav">
-        <span className="logo" onClick={() => setSelectedCity(null)}>
+        <span className="logo" onClick={handleBack}>
           <span className="logo-icon">&#x2728;</span>
           City Facts Quiz
         </span>
@@ -43,11 +76,24 @@ function App() {
       </nav>
 
       <main>
-        {selectedCity ? (
+        {duelLoading ? (
+          <div className="quiz-loading">
+            <div className="loader" />
+            <p>Loading duel challenge...</p>
+          </div>
+        ) : duelError ? (
+          <div className="quiz-error">
+            <p>{duelError}</p>
+            <button className="btn btn-primary" onClick={handleBack}>
+              Back to Cities
+            </button>
+          </div>
+        ) : selectedCity ? (
           <Quiz
             city={selectedCity}
             lang={lang}
-            onBack={() => setSelectedCity(null)}
+            onBack={handleBack}
+            duel={duel}
           />
         ) : (
           <CitySelect onSelectCity={setSelectedCity} lang={lang} />

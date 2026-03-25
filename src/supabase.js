@@ -131,3 +131,122 @@ export async function getPlayerRank(city, score) {
   if (error) return null;
   return (count || 0) + 1;
 }
+
+// ── Duels ────────────────────────────────────────────────────────────
+
+export async function createDuel({
+  city,
+  lang,
+  challengerName,
+  questionIds,
+  challengerScore,
+  challengerCorrect,
+  challengerTotal,
+  challengerBestStreak,
+  challengerAnswers,
+}) {
+  const { data, error } = await supabase
+    .from('duels')
+    .insert({
+      city,
+      lang,
+      challenger_name: challengerName.trim().slice(0, 30),
+      question_ids: questionIds,
+      challenger_score: challengerScore,
+      challenger_correct: challengerCorrect,
+      challenger_total: challengerTotal,
+      challenger_best_streak: challengerBestStreak,
+      challenger_answers: challengerAnswers,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function getDuel(duelId) {
+  const { data, error } = await supabase
+    .from('duels')
+    .select('*')
+    .eq('id', duelId)
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function completeDuel(duelId, {
+  opponentName,
+  opponentScore,
+  opponentCorrect,
+  opponentTotal,
+  opponentBestStreak,
+  opponentAnswers,
+}) {
+  const { data, error } = await supabase
+    .from('duels')
+    .update({
+      opponent_name: opponentName.trim().slice(0, 30),
+      opponent_score: opponentScore,
+      opponent_correct: opponentCorrect,
+      opponent_total: opponentTotal,
+      opponent_best_streak: opponentBestStreak,
+      opponent_answers: opponentAnswers,
+      completed_at: new Date().toISOString(),
+    })
+    .eq('id', duelId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function getQuizQuestionsByIds(ids, lang = 'en') {
+  const langSuffix = lang === 'en' ? 'en' : lang;
+  const questionCol = `quiz_question_${langSuffix}`;
+  const answerACol = `quiz_answer_a_${langSuffix}`;
+  const answerBCol = `quiz_answer_b_${langSuffix}`;
+  const answerCCol = `quiz_answer_c_${langSuffix}`;
+  const answerDCol = `quiz_answer_d_${langSuffix}`;
+
+  const { data, error } = await supabase
+    .from('facts')
+    .select(
+      `id, city, country, category, title, title_de, title_fr, title_it,
+       fact_text, fact_text_de, fact_text_fr, fact_text_it,
+       image_url, year, juiciness, quiz_difficulty,
+       ${questionCol}, ${answerACol}, ${answerBCol}, ${answerCCol}, ${answerDCol},
+       quiz_correct_answer`
+    )
+    .in('id', ids);
+
+  if (error) throw error;
+
+  // Preserve the original order from ids array
+  const mapped = data.map((row) => ({
+    id: row.id,
+    city: row.city,
+    country: row.country,
+    category: row.category,
+    title: row[`title${lang === 'en' ? '' : `_${lang}`}`] || row.title,
+    fact: row[`fact_text${lang === 'en' ? '' : `_${lang}`}`] || row.fact_text,
+    imageUrl: row.image_url,
+    year: row.year,
+    difficulty: row.quiz_difficulty,
+    juiciness: row.juiciness,
+    question: row[questionCol],
+    answers: [
+      row[answerACol],
+      row[answerBCol],
+      row[answerCCol],
+      row[answerDCol],
+    ],
+    correctAnswer: row.quiz_correct_answer,
+  }));
+
+  // Sort by the order of ids
+  const idOrder = new Map(ids.map((id, i) => [id, i]));
+  return mapped.sort((a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0));
+}

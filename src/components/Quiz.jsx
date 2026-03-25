@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
-import { getQuizQuestions } from '../supabase';
+import { getQuizQuestions, getQuizQuestionsByIds, completeDuel } from '../supabase';
 import QuizCard from './QuizCard';
 import Results from './Results';
+import DuelResults from './DuelResults';
 import { playCorrect, playWrong, playStreak } from '../sounds';
 
 const BASE_POINTS = 100;
@@ -16,7 +17,7 @@ function calcPoints(isCorrect, elapsed, streak) {
   return Math.round((BASE_POINTS + speedBonus) * streakMultiplier);
 }
 
-export default function Quiz({ city, lang, onBack }) {
+export default function Quiz({ city, lang, onBack, duel }) {
   const [questions, setQuestions] = useState([]);
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState([]);
@@ -27,17 +28,31 @@ export default function Quiz({ city, lang, onBack }) {
   const [streak, setStreak] = useState(0);
   const [pointsPopup, setPointsPopup] = useState(null);
   const [transition, setTransition] = useState(false);
+  const [waitingForNext, setWaitingForNext] = useState(false);
+  const [completedDuel, setCompletedDuel] = useState(null);
+  const [duelStarted, setDuelStarted] = useState(!duel);
+  const [duelPlayerName, setDuelPlayerName] = useState(
+    () => localStorage.getItem('quizPlayerName') || ''
+  );
 
   useEffect(() => {
     setLoading(true);
-    getQuizQuestions(city, lang)
-      .then((qs) => {
-        const shuffled = qs.sort(() => Math.random() - 0.5);
-        setQuestions(shuffled);
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
-  }, [city, lang]);
+    if (duel) {
+      // Duel mode: fetch the exact questions in order
+      getQuizQuestionsByIds(duel.question_ids, lang)
+        .then((qs) => setQuestions(qs))
+        .catch((err) => setError(err.message))
+        .finally(() => setLoading(false));
+    } else {
+      getQuizQuestions(city, lang)
+        .then((qs) => {
+          const shuffled = qs.sort(() => Math.random() - 0.5);
+          setQuestions(shuffled);
+        })
+        .catch((err) => setError(err.message))
+        .finally(() => setLoading(false));
+    }
+  }, [city, lang, duel]);
 
   const handleAnswer = useCallback(
     (answerIndex, elapsed) => {
@@ -66,27 +81,30 @@ export default function Quiz({ city, lang, onBack }) {
         { questionIndex: current, answerIndex, isCorrect, points, elapsed },
       ];
       setAnswers(newAnswers);
-
-      setTimeout(() => {
-        if (current + 1 < questions.length) {
-          setTransition(true);
-          setTimeout(() => {
-            setCurrent(current + 1);
-            setTransition(false);
-          }, 300);
-        } else {
-          setQuizDone(true);
-        }
-      }, 1800);
+      setWaitingForNext(true);
     },
     [current, questions, answers, streak]
   );
+
+  const handleNext = useCallback(() => {
+    if (!waitingForNext) return;
+    setWaitingForNext(false);
+    if (current + 1 < questions.length) {
+      setTransition(true);
+      setTimeout(() => {
+        setCurrent(current + 1);
+        setTransition(false);
+      }, 300);
+    } else {
+      setQuizDone(true);
+    }
+  }, [waitingForNext, current, questions]);
 
   if (loading) {
     return (
       <div className="quiz-loading">
         <div className="loader" />
-        <p>Loading {city} quiz...</p>
+        <p>{duel ? `Loading ${duel.challenger_name}'s challenge...` : `Loading ${city} quiz...`}</p>
       </div>
     );
   }
@@ -113,10 +131,124 @@ export default function Quiz({ city, lang, onBack }) {
     );
   }
 
+  // Duel intro screen — enter name before starting
+  if (duel && !duelStarted) {
+    return (
+      <div className="results animate-in">
+        <div className="results-card">
+          <div className="results-emoji">{'\u2694\uFE0F'}</div>
+          <h2 className="results-title">Duel Challenge!</h2>
+          <p className="results-message">
+            <strong>{duel.challenger_name}</strong> challenged you to a {city} quiz duel!
+            Answer the same {duel.challenger_total} questions and see who knows more.
+          </p>
+          <form
+            className="score-submit"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const name = duelPlayerName.trim();
+              if (!name) return;
+              localStorage.setItem('quizPlayerName', name);
+              setDuelStarted(true);
+            }}
+          >
+            <p className="score-submit-label">Enter your name to begin</p>
+            <div className="score-submit-row">
+              <input
+                type="text"
+                className="name-input"
+                placeholder="Your name..."
+                value={duelPlayerName}
+                onChange={(e) => setDuelPlayerName(e.target.value)}
+                maxLength={30}
+                autoFocus
+              />
+              <button
+                type="submit"
+                className="btn btn-challenge"
+                disabled={!duelPlayerName.trim()}
+                style={{ padding: '12px 24px' }}
+              >
+                Start Duel
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   if (quizDone) {
+    // If this was a duel, submit opponent results and show comparison
+    if (duel && !completedDuel) {
+      const opponentName = duelPlayerName.trim() || localStorage.getItem('quizPlayerName') || 'Challenger';
+      const bestStreakVal = answers.reduce(
+        (acc, a) => {
+          const cur = a.isCorrect ? acc.cur + 1 : 0;
+          return { cur, max: Math.max(acc.max, cur) };
+        },
+        { cur: 0, max: 0 }
+      ).max;
+
+      completeDuel(duel.id, {
+        opponentName,
+        opponentScore: totalPoints,
+        opponentCorrect: answers.filter((a) => a.isCorrect).length,
+        opponentTotal: questions.length,
+        opponentBestStreak: bestStreakVal,
+        opponentAnswers: answers.map((a) => ({
+          isCorrect: a.isCorrect,
+          points: a.points,
+          elapsed: a.elapsed,
+        })),
+      })
+        .then((d) => setCompletedDuel(d))
+        .catch(() => {
+          // Even if save fails, show comparison with local data
+          setCompletedDuel({
+            ...duel,
+            opponent_name: opponentName,
+            opponent_score: totalPoints,
+            opponent_correct: answers.filter((a) => a.isCorrect).length,
+            opponent_total: questions.length,
+            opponent_best_streak: bestStreakVal,
+            opponent_answers: answers.map((a) => ({
+              isCorrect: a.isCorrect,
+              points: a.points,
+              elapsed: a.elapsed,
+            })),
+          });
+        });
+
+      return (
+        <div className="quiz-loading">
+          <div className="loader" />
+          <p>Comparing results...</p>
+        </div>
+      );
+    }
+
+    if (completedDuel) {
+      return (
+        <DuelResults
+          duel={completedDuel}
+          onBack={() => {
+            setCurrent(0);
+            setAnswers([]);
+            setQuizDone(false);
+            setTotalPoints(0);
+            setStreak(0);
+            setCompletedDuel(null);
+          }}
+          onHome={onBack}
+        />
+      );
+    }
+
     return (
       <Results
         city={city}
+        lang={lang}
         questions={questions}
         answers={answers}
         totalPoints={totalPoints}
@@ -185,8 +317,10 @@ export default function Quiz({ city, lang, onBack }) {
           key={q.id}
           question={q}
           onAnswer={handleAnswer}
+          onNext={handleNext}
           questionNumber={current + 1}
           streak={streak}
+          isLast={current + 1 === questions.length}
         />
       </div>
     </div>

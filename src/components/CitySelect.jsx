@@ -3,16 +3,16 @@ import { getCities } from '../supabase';
 import Leaderboard from './Leaderboard';
 
 const CITY_IMAGES = {
-  Zurich: 'https://images.unsplash.com/photo-1515488764276-beab7607c1e6?w=400&h=250&fit=crop',
-  Bern: 'https://images.unsplash.com/photo-1587974928442-77dc3e0dba72?w=400&h=250&fit=crop',
-  Basel: 'https://images.unsplash.com/photo-1549877452-d6e99849e5a0?w=400&h=250&fit=crop',
-  Lucerne: 'https://images.unsplash.com/photo-1527668752968-14dc70a27c95?w=400&h=250&fit=crop',
-  Geneva: 'https://images.unsplash.com/photo-1573108037329-37aa135a142e?w=400&h=250&fit=crop',
-  Lausanne: 'https://images.unsplash.com/photo-1559128010-7c1ad6e1b6a5?w=400&h=250&fit=crop',
+  Zurich: 'https://images.unsplash.com/photo-1515488764276-beab7607c1e6?w=600&h=400&fit=crop',
+  Bern: 'https://images.unsplash.com/photo-1741900033774-5957b5f03dd7?w=600&h=400&fit=crop',
+  Basel: 'https://images.unsplash.com/photo-1627410566847-738061cb6995?w=600&h=400&fit=crop',
+  Lucerne: 'https://images.unsplash.com/photo-1749195403421-b40b0ff3cae7?w=600&h=400&fit=crop',
+  Geneva: 'https://images.unsplash.com/photo-1757584666096-59deb41f1124?w=600&h=400&fit=crop',
+  Lausanne: 'https://images.unsplash.com/photo-1603646049799-736bb072cec5?w=600&h=400&fit=crop',
 };
 
 function getDefaultImage(city) {
-  return CITY_IMAGES[city] || `https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=400&h=250&fit=crop`;
+  return CITY_IMAGES[city] || `https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=600&h=400&fit=crop`;
 }
 
 export default function CitySelect({ onSelectCity, lang }) {

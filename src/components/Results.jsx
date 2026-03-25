@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import Confetti from './Confetti';
 import Leaderboard from './Leaderboard';
 import { playComplete } from '../sounds';
-import { submitScore, getPlayerRank } from '../supabase';
+import { submitScore, getPlayerRank, createDuel } from '../supabase';
 
 export default function Results({
   city,
+  lang,
   questions,
   answers,
   totalPoints,
@@ -20,6 +21,9 @@ export default function Results({
   const [rank, setRank] = useState(null);
   const [submittedId, setSubmittedId] = useState(null);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [duelLink, setDuelLink] = useState(null);
+  const [creatingDuel, setCreatingDuel] = useState(false);
+  const [duelCopied, setDuelCopied] = useState(false);
 
   const correct = answers.filter((a) => a.isCorrect).length;
   const total = questions.length;
@@ -66,6 +70,52 @@ export default function Results({
       setSubmitError(err.message);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleChallenge = async () => {
+    const name = playerName.trim() || 'Anonymous';
+    setCreatingDuel(true);
+    try {
+      const duel = await createDuel({
+        city,
+        lang: lang || 'en',
+        challengerName: name,
+        questionIds: questions.map((q) => q.id),
+        challengerScore: totalPoints,
+        challengerCorrect: correct,
+        challengerTotal: total,
+        challengerBestStreak: bestStreak,
+        challengerAnswers: answers.map((a) => ({
+          isCorrect: a.isCorrect,
+          points: a.points,
+          elapsed: a.elapsed,
+        })),
+      });
+      const url = `${window.location.origin}${window.location.pathname}?duel=${duel.id}`;
+      setDuelLink(url);
+    } catch (err) {
+      setSubmitError(err.message);
+    } finally {
+      setCreatingDuel(false);
+    }
+  };
+
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(duelLink);
+      setDuelCopied(true);
+      setTimeout(() => setDuelCopied(false), 2000);
+    } catch {
+      // fallback
+      const input = document.createElement('input');
+      input.value = duelLink;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand('copy');
+      document.body.removeChild(input);
+      setDuelCopied(true);
+      setTimeout(() => setDuelCopied(false), 2000);
     }
   };
 
@@ -219,6 +269,38 @@ export default function Results({
             );
           })}
         </div>
+
+        {/* Duel challenge */}
+        {!duelLink ? (
+          <div className="duel-challenge-section">
+            <button
+              className="btn btn-challenge"
+              onClick={handleChallenge}
+              disabled={creatingDuel}
+            >
+              {creatingDuel ? 'Creating...' : '\u2694\uFE0F Challenge a Friend'}
+            </button>
+          </div>
+        ) : (
+          <div className="duel-link-section animate-in">
+            <p className="duel-link-label">Share this link with a friend:</p>
+            <div className="duel-link-row">
+              <input
+                type="text"
+                className="duel-link-input"
+                value={duelLink}
+                readOnly
+                onClick={(e) => e.target.select()}
+              />
+              <button className="btn btn-primary btn-copy" onClick={handleCopyLink}>
+                {duelCopied ? '\u2705 Copied!' : '\u{1F4CB} Copy'}
+              </button>
+            </div>
+            <p className="duel-link-hint">
+              They'll answer the same questions, then see a head-to-head comparison!
+            </p>
+          </div>
+        )}
 
         <div className="results-actions">
           <button className="btn btn-primary" onClick={onRetry}>
