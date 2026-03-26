@@ -1,7 +1,7 @@
 const translations = {
   en: {
     // App / Nav
-    appTitle: 'City Facts Quiz',
+    appTitle: 'Swissquiz 🇨🇭',
     loadingDuel: 'Loading duel challenge...',
     backToCities: 'Back to Cities',
     duelAlreadyCompleted: 'This duel has already been completed.',
@@ -11,8 +11,8 @@ const translations = {
     discoveringCities: 'Discovering cities...',
     couldNotLoadCities: 'Could not load cities:',
     checkConnection: 'Check your Supabase connection settings.',
-    heroTitle: 'City Facts Quiz',
-    heroSubtitle: 'Pick a city and test your knowledge about its most surprising facts',
+    heroTitle: 'Swissquiz 🇨🇭',
+    heroSubtitle: 'Pick a Swiss city and test your knowledge about its most surprising facts',
     leaderboard: 'Leaderboard',
     questionCount: (n) => `${n} question${n !== 1 ? 's' : ''}`,
 
@@ -87,7 +87,7 @@ const translations = {
   },
 
   de: {
-    appTitle: 'City Facts Quiz',
+    appTitle: 'Swissquiz 🇨🇭',
     loadingDuel: 'Duell wird geladen...',
     backToCities: 'Zurück zu den Städten',
     duelAlreadyCompleted: 'Dieses Duell wurde bereits abgeschlossen.',
@@ -96,8 +96,8 @@ const translations = {
     discoveringCities: 'Städte werden entdeckt...',
     couldNotLoadCities: 'Städte konnten nicht geladen werden:',
     checkConnection: 'Überprüfe deine Supabase-Verbindung.',
-    heroTitle: 'City Facts Quiz',
-    heroSubtitle: 'Wähle eine Stadt und teste dein Wissen über ihre überraschendsten Fakten',
+    heroTitle: 'Swissquiz 🇨🇭',
+    heroSubtitle: 'Wähle eine Schweizer Stadt und teste dein Wissen über ihre überraschendsten Fakten',
     leaderboard: 'Bestenliste',
     questionCount: (n) => `${n} Frage${n !== 1 ? 'n' : ''}`,
 
@@ -167,7 +167,7 @@ const translations = {
   },
 
   fr: {
-    appTitle: 'City Facts Quiz',
+    appTitle: 'Swissquiz 🇨🇭',
     loadingDuel: 'Chargement du duel...',
     backToCities: 'Retour aux villes',
     duelAlreadyCompleted: 'Ce duel a déjà été terminé.',
@@ -176,8 +176,8 @@ const translations = {
     discoveringCities: 'Découverte des villes...',
     couldNotLoadCities: 'Impossible de charger les villes :',
     checkConnection: 'Vérifie tes paramètres de connexion Supabase.',
-    heroTitle: 'City Facts Quiz',
-    heroSubtitle: 'Choisis une ville et teste tes connaissances sur ses faits les plus surprenants',
+    heroTitle: 'Swissquiz 🇨🇭',
+    heroSubtitle: 'Choisis une ville suisse et teste tes connaissances sur ses faits les plus surprenants',
     leaderboard: 'Classement',
     questionCount: (n) => `${n} question${n !== 1 ? 's' : ''}`,
 
@@ -247,7 +247,7 @@ const translations = {
   },
 
   it: {
-    appTitle: 'City Facts Quiz',
+    appTitle: 'Swissquiz \ud83c\udde8\ud83c\udded',
     loadingDuel: 'Caricamento del duello...',
     backToCities: 'Torna alle città',
     duelAlreadyCompleted: 'Questo duello è già stato completato.',
@@ -256,8 +256,8 @@ const translations = {
     discoveringCities: 'Scoprendo le città...',
     couldNotLoadCities: 'Impossibile caricare le città:',
     checkConnection: 'Controlla le impostazioni di connessione Supabase.',
-    heroTitle: 'City Facts Quiz',
-    heroSubtitle: 'Scegli una città e metti alla prova le tue conoscenze sui fatti più sorprendenti',
+    heroTitle: 'Swissquiz 🇨🇭',
+    heroSubtitle: 'Scegli una città svizzera e metti alla prova le tue conoscenze sui fatti più sorprendenti',
     leaderboard: 'Classifica',
     questionCount: (n) => `${n} domand${n !== 1 ? 'e' : 'a'}`,
 
