@@ -13,10 +13,8 @@ export async function getCities() {
 
   while (true) {
     const { data, error } = await supabase
-      .from('facts')
+      .from('quiz_questions')
       .select('city, country')
-      .not('quiz_question_en', 'is', null)
-      .not('quiz_correct_answer', 'is', null)
       .range(from, from + pageSize - 1);
 
     if (error) throw error;
@@ -41,72 +39,29 @@ export async function getCities() {
 }
 
 export async function getQuizQuestions(city, lang = 'en', limit = 5) {
-  const langSuffix = lang === 'en' ? 'en' : lang;
-  const questionCol = `quiz_question_${langSuffix}`;
-  const answerACol = `quiz_answer_a_${langSuffix}`;
-  const answerBCol = `quiz_answer_b_${langSuffix}`;
-  const answerCCol = `quiz_answer_c_${langSuffix}`;
-  const answerDCol = `quiz_answer_d_${langSuffix}`;
-
-  // Try easy questions first (difficulty <= 3)
-  let { data, error } = await supabase
-    .from('facts')
-    .select(
-      `id, city, country, category, title, title_de, title_fr, title_it,
-       fact_text, fact_text_de, fact_text_fr, fact_text_it,
-       image_url, year, juiciness, quiz_difficulty,
-       ${questionCol}, ${answerACol}, ${answerBCol}, ${answerCCol}, ${answerDCol},
-       quiz_correct_answer`
-    )
+  const { data, error } = await supabase
+    .from('quiz_questions')
+    .select('*')
     .eq('city', city)
-    .not(questionCol, 'is', null)
-    .not('quiz_correct_answer', 'is', null)
-    .lte('quiz_difficulty', 3)
     .order('juiciness', { ascending: false })
     .limit(limit);
 
   if (error) throw error;
 
-  // Fallback: if not enough easy questions, fetch all difficulties
-  if (data.length < limit) {
-    const fallback = await supabase
-      .from('facts')
-      .select(
-        `id, city, country, category, title, title_de, title_fr, title_it,
-         fact_text, fact_text_de, fact_text_fr, fact_text_it,
-         image_url, year, juiciness, quiz_difficulty,
-         ${questionCol}, ${answerACol}, ${answerBCol}, ${answerCCol}, ${answerDCol},
-         quiz_correct_answer`
-      )
-      .eq('city', city)
-      .not(questionCol, 'is', null)
-      .not('quiz_correct_answer', 'is', null)
-      .order('quiz_difficulty', { ascending: true })
-      .order('juiciness', { ascending: false })
-      .limit(limit);
-
-    if (!fallback.error) data = fallback.data;
-  }
-
   return data.map((row) => ({
-    id: row.id,
+    id: row.fact_id,
     city: row.city,
     country: row.country,
     category: row.category,
-    title: row[`title${lang === 'en' ? '' : `_${lang}`}`] || row.title,
-    fact: row[`fact_text${lang === 'en' ? '' : `_${lang}`}`] || row.fact_text,
+    title: row.title,
+    fact: row.fact_text,
     imageUrl: row.image_url,
     year: row.year,
-    difficulty: row.quiz_difficulty,
+    difficulty: row.difficulty,
     juiciness: row.juiciness,
-    question: row[questionCol],
-    answers: [
-      row[answerACol],
-      row[answerBCol],
-      row[answerCCol],
-      row[answerDCol],
-    ],
-    correctAnswer: row.quiz_correct_answer,
+    question: row.question,
+    answers: [row.answer_a, row.answer_b, row.answer_c, row.answer_d],
+    correctAnswer: row.correct_answer,
   }));
 }
 
@@ -227,46 +182,27 @@ export async function completeDuel(duelId, {
 }
 
 export async function getQuizQuestionsByIds(ids, lang = 'en') {
-  const langSuffix = lang === 'en' ? 'en' : lang;
-  const questionCol = `quiz_question_${langSuffix}`;
-  const answerACol = `quiz_answer_a_${langSuffix}`;
-  const answerBCol = `quiz_answer_b_${langSuffix}`;
-  const answerCCol = `quiz_answer_c_${langSuffix}`;
-  const answerDCol = `quiz_answer_d_${langSuffix}`;
-
   const { data, error } = await supabase
-    .from('facts')
-    .select(
-      `id, city, country, category, title, title_de, title_fr, title_it,
-       fact_text, fact_text_de, fact_text_fr, fact_text_it,
-       image_url, year, juiciness, quiz_difficulty,
-       ${questionCol}, ${answerACol}, ${answerBCol}, ${answerCCol}, ${answerDCol},
-       quiz_correct_answer`
-    )
-    .in('id', ids);
+    .from('quiz_questions')
+    .select('*')
+    .in('fact_id', ids);
 
   if (error) throw error;
 
-  // Preserve the original order from ids array
   const mapped = data.map((row) => ({
-    id: row.id,
+    id: row.fact_id,
     city: row.city,
     country: row.country,
     category: row.category,
-    title: row[`title${lang === 'en' ? '' : `_${lang}`}`] || row.title,
-    fact: row[`fact_text${lang === 'en' ? '' : `_${lang}`}`] || row.fact_text,
+    title: row.title,
+    fact: row.fact_text,
     imageUrl: row.image_url,
     year: row.year,
-    difficulty: row.quiz_difficulty,
+    difficulty: row.difficulty,
     juiciness: row.juiciness,
-    question: row[questionCol],
-    answers: [
-      row[answerACol],
-      row[answerBCol],
-      row[answerCCol],
-      row[answerDCol],
-    ],
-    correctAnswer: row.quiz_correct_answer,
+    question: row.question,
+    answers: [row.answer_a, row.answer_b, row.answer_c, row.answer_d],
+    correctAnswer: row.correct_answer,
   }));
 
   // Sort by the order of ids

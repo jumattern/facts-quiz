@@ -5,7 +5,8 @@
  *   node scripts/regenerate-quiz.mjs                        # dry-run, 5 rows, Claude
  *   node scripts/regenerate-quiz.mjs --provider groq        # use Groq (fast & free)
  *   node scripts/regenerate-quiz.mjs --limit 50             # dry-run, 50 rows
- *   node scripts/regenerate-quiz.mjs --apply                # write ALL rows back to DB
+ *   node scripts/regenerate-quiz.mjs --apply                # generate + write to DB
+ *   node scripts/regenerate-quiz.mjs --upload               # upload preview-questions.json to DB
  *   node scripts/regenerate-quiz.mjs --apply --limit 100 --provider groq
  *
  * Env vars (reads from .env):
@@ -18,7 +19,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { config } from 'dotenv';
-import { writeFileSync } from 'fs';
+import { writeFileSync, readFileSync } from 'fs';
 
 config(); // load .env
 
@@ -28,6 +29,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 const args = process.argv.slice(2);
 const APPLY = args.includes('--apply');
+const UPLOAD = args.includes('--upload');
 const limitIdx = args.indexOf('--limit');
 const LIMIT = limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : (APPLY ? 99999 : 5);
 const providerIdx = args.indexOf('--provider');
@@ -35,20 +37,22 @@ const PROVIDER = providerIdx !== -1 ? args[providerIdx + 1] : 'anthropic';
 const BATCH_SIZE = 10;
 const CONCURRENCY = PROVIDER === 'groq' ? 2 : 3; // groq has tighter rate limits
 
-console.log(`Mode: ${APPLY ? 'APPLY (will write to DB)' : 'DRY-RUN (preview only)'}`);
-console.log(`Provider: ${PROVIDER}, Limit: ${LIMIT}, Batch size: ${BATCH_SIZE}, Concurrency: ${CONCURRENCY}\n`);
+const mode = UPLOAD ? 'UPLOAD (from preview-questions.json)' : APPLY ? 'APPLY (will write to DB)' : 'DRY-RUN (preview only)';
+console.log(`Mode: ${mode}`);
+if (!UPLOAD) console.log(`Provider: ${PROVIDER}, Limit: ${LIMIT}, Batch size: ${BATCH_SIZE}, Concurrency: ${CONCURRENCY}`);
+console.log();
 
 // ── Fetch facts ──────────────────────────────────────────────────────
 async function fetchFacts() {
   let allFacts = [];
   let from = 0;
-  const pageSize = 1000;
+  const pageSize = 500; // smaller pages to avoid statement timeout
 
   while (from < LIMIT) {
     const fetchSize = Math.min(pageSize, LIMIT - from);
     const { data, error } = await supabase
       .from('facts')
-      .select('id, city, country, fact_text, category, year, title')
+      .select('id, city, country, fact_text, category, year, title, juiciness, image_url')
       .not('fact_text', 'is', null)
       .range(from, from + fetchSize - 1)
       .order('id', { ascending: true });
@@ -64,29 +68,60 @@ async function fetchFacts() {
   return allFacts;
 }
 
+// ── Fetch facts by IDs (for --upload mode, avoids full table scan) ───
+async function fetchFactsByIds(ids) {
+  const allFacts = [];
+  for (let i = 0; i < ids.length; i += 50) {
+    const chunk = ids.slice(i, i + 50);
+    const { data, error } = await supabase
+      .from('facts')
+      .select('id, city, country, fact_text, category, year, title, juiciness, image_url')
+      .in('id', chunk);
+    if (error) throw error;
+    allFacts.push(...data);
+    if ((i + 50) % 500 === 0) process.stdout.write(`  Fetched ${allFacts.length}/${ids.length} facts\n`);
+  }
+  console.log(`Fetched ${allFacts.length} facts by ID\n`);
+  return allFacts;
+}
+
 // ── Generate easy questions via Claude ───────────────────────────────
-const SYSTEM_PROMPT = `You generate FUN and VERY EASY multiple-choice quiz questions from city facts. These should be enjoyable pub-quiz style questions that most people can answer.
+const SYSTEM_PROMPT = `You generate FUN and EXTREMELY EASY multiple-choice quiz questions about Swiss cities, aimed at casual players who may know very little about Switzerland. Think "tourist trivia" — questions so easy that someone who visited once or watched a travel video could answer them.
 
-CRITICAL RULES FOR MAKING QUESTIONS EASY:
+You receive a batch of facts about ONE city. Read ALL the facts to build context. SKIP any fact that is too obscure to make a truly easy question — it is MUCH BETTER to skip a fact than to produce a hard question.
 
-1. NEVER ask about specific years, dates, exact numbers, or death/birth details.
-2. NEVER ask "When did X happen?" or "What year...?" or "Where did X die/born?"
-3. Instead, use these EASY question patterns:
-   - Give a fun description and ask WHICH CITY it's about: "Which city is home to [interesting thing from fact]?"
-   - Ask about the GENERAL TOPIC: "What is the Jet d'Eau in Geneva?" → answers: A fountain, A museum, A bridge, A park
-   - Ask TRUE/FALSE style (as 4 options): "The [landmark] in [city] is famous for...?" → correct description + 3 wrong ones
-   - Ask WHAT CATEGORY something falls into: "What kind of attraction is [X]?" → Museum, Park, Bridge, Church
-   - Use the fact to create a "fun fact" question: "[Interesting claim from fact] — which city is this about?"
+WHAT MAKES A QUESTION EASY ENOUGH:
+- A 15-year-old who has never been to Switzerland could guess the answer
+- The question is about something visible, tangible, or widely known (a lake, a mountain, a sport, chocolate, cheese, a famous building)
+- The wrong answers are from a completely different category so the right answer "feels" obvious
 
-4. The correct answer should be guessable through common sense or general knowledge, even without knowing the specific fact.
-5. Wrong answers must be CLEARLY wrong — not tricky. Use obviously different categories/cities.
-6. Vary the correct answer position across questions (don't always put it in the same slot).
-7. Keep it fun and interesting — the goal is entertainment, not a history exam.
-8. Keep questions and answers concise (under 120 chars each).
-9. Set difficulty to 1 (very easy) or 2 (easy).
+SKIP these types of facts (output nothing for them):
+- Obscure historical figures nobody outside Switzerland has heard of
+- Niche academic, scientific, or literary achievements
+- Internal political events, reforms, or administrative details
+- Anything where you'd need specialized knowledge to even understand the question
 
-GOOD example: "Which Swiss city has a famous 140-meter-tall water fountain in its lake?" → Geneva, Zurich, Basel, Bern
-BAD example: "What year was the Jet d'Eau first installed?" → 1886, 1891, 1903, 1920
+GOOD question patterns:
+1. LANDMARKS → "What is the [X] in [City]?" → correct description + 3 silly wrong ones
+2. FOOD/CULTURE → "Which city is famous for [well-known thing]?"
+3. GEOGRAPHY → "What lake/mountain/river is near [City]?"
+4. WORLD-FAMOUS PEOPLE (Einstein, Federer, Chaplin, etc.) → simple questions
+5. GENERAL VIBES → "What is [City] best known for?" → Tourism | Banking | Chocolate | Skiing
+
+BAD question patterns (NEVER use):
+- "What did [obscure person] do?" — nobody knows who they are
+- "What type of product did [unknown inventor] create?" — too specific
+- "What year / how many / what exact number...?" — impossible to guess
+- Any question where you have to already know the answer to get it right
+
+ABSOLUTE RULES:
+- SKIP facts that can't produce genuinely easy questions — return fewer items than input, that's fine
+- NEVER mention obscure people by name in the question
+- The correct answer must be guessable with common sense alone
+- Wrong answers must be OBVIOUSLY wrong — comically different
+- Keep questions under 120 characters, answers under 60 characters
+- Vary the correct answer position (0-3)
+- Set difficulty to 1 (trivial) or 2 (easy)
 
 Respond with a JSON array (no markdown fences). Each element:
 {
@@ -144,15 +179,18 @@ async function callLLM(systemPrompt, userPrompt) {
 }
 
 async function generateBatch(facts) {
+  // Group facts by city so the LLM sees full city context
+  const city = facts[0]?.city || 'Unknown';
   const factsText = facts
     .map(
       (f) =>
-        `[ID ${f.id}] City: ${f.city}, ${f.country}. ` +
-        `Category: ${f.category || 'general'}. ` +
+        `[ID ${f.id}] Category: ${f.category || 'general'}. ` +
         (f.year ? `Year: ${f.year}. ` : '') +
         `Fact: ${f.fact_text}`
     )
     .join('\n\n');
+
+  const prompt = `City: ${city}, ${facts[0]?.country || 'Switzerland'}\n\nHere are ${facts.length} facts about ${city}. Read them ALL first. SKIP any fact that is too obscure — only generate questions for facts that a casual tourist could answer. It's OK to return fewer questions than facts.\n\n${factsText}`;
 
   // For Groq's json_object mode, ask for a wrapper object
   const groqSuffix =
@@ -162,7 +200,7 @@ async function generateBatch(facts) {
 
   const text = await callLLM(
     SYSTEM_PROMPT,
-    `Generate one easy quiz question per fact below.${groqSuffix}\n\n${factsText}`
+    `Generate one easy quiz question per fact below.${groqSuffix}\n\n${prompt}`
   );
 
   try {
@@ -177,23 +215,63 @@ async function generateBatch(facts) {
   }
 }
 
-// ── Update Supabase ──────────────────────────────────────────────────
-async function updateRow(q) {
-  const { error } = await supabase
-    .from('facts')
-    .update({
-      quiz_question_en: q.question,
-      quiz_answer_a_en: q.answers[0],
-      quiz_answer_b_en: q.answers[1],
-      quiz_answer_c_en: q.answers[2],
-      quiz_answer_d_en: q.answers[3],
-      quiz_correct_answer: q.correct,
-      quiz_difficulty: q.difficulty,
-    })
-    .eq('id', q.id);
+// ── Write to quiz_questions table ─────────────────────────────────────
+async function writeQuestions(allQuestions, factsById) {
+  // Clear old questions in batches to avoid statement timeout
+  console.log('Clearing old quiz_questions...');
+  let deleted = true;
+  while (deleted) {
+    const { data, error: delErr } = await supabase
+      .from('quiz_questions')
+      .delete()
+      .limit(1000)
+      .gte('id', 0)
+      .select('id');
+    if (delErr) throw delErr;
+    deleted = data && data.length > 0;
+  }
 
-  if (error) console.error(`  ✗ Failed to update id=${q.id}: ${error.message}`);
-  return !error;
+  // Batch insert in chunks of 500
+  const rows = [];
+  let skippedMissing = 0;
+  for (const q of allQuestions) {
+    const fact = factsById.get(q.id);
+    if (!fact) {
+      skippedMissing++;
+      continue;
+    }
+    rows.push({
+      fact_id: q.id,
+      city: fact.city,
+      country: fact.country,
+      category: fact.category || null,
+      title: fact.title || null,
+      fact_text: fact.fact_text || null,
+      image_url: fact.image_url || null,
+      year: fact.year || null,
+      juiciness: fact.juiciness || null,
+      difficulty: q.difficulty,
+      question: q.question,
+      answer_a: q.answers[0],
+      answer_b: q.answers[1],
+      answer_c: q.answers[2],
+      answer_d: q.answers[3],
+      correct_answer: q.correct,
+    });
+  }
+  if (skippedMissing) console.log(`  Skipped ${skippedMissing} questions with missing fact data`);
+
+  let inserted = 0;
+  for (let i = 0; i < rows.length; i += 100) {
+    const chunk = rows.slice(i, i + 100);
+    const { error } = await supabase.from('quiz_questions').insert(chunk);
+    if (error) {
+      console.error(`  ✗ Insert batch at offset ${i} failed: ${error.message}`);
+    } else {
+      inserted += chunk.length;
+    }
+  }
+  return inserted;
 }
 
 // ── Concurrency helper ───────────────────────────────────────────────
@@ -212,21 +290,48 @@ async function processWithConcurrency(batches, fn, concurrency) {
 
 // ── Main ─────────────────────────────────────────────────────────────
 async function main() {
+  // Upload mode: read from saved JSON, fetch only needed facts, insert
+  if (UPLOAD) {
+    const raw = readFileSync('scripts/preview-questions.json', 'utf-8');
+    const allQuestions = JSON.parse(raw);
+    console.log(`Loaded ${allQuestions.length} questions from preview-questions.json`);
+
+    const ids = [...new Set(allQuestions.map((q) => q.id))];
+    const facts = await fetchFactsByIds(ids);
+    const factsById = new Map(facts.map((f) => [f.id, f]));
+
+    console.log('Writing to quiz_questions table...');
+    const inserted = await writeQuestions(allQuestions, factsById);
+    console.log(`\nDone! Inserted ${inserted}/${allQuestions.length} rows into quiz_questions.`);
+    return;
+  }
+
   const facts = await fetchFacts();
   if (!facts.length) {
     console.log('No facts found.');
     return;
   }
 
-  // Split into batches
-  const batches = [];
-  for (let i = 0; i < facts.length; i += BATCH_SIZE) {
-    batches.push(facts.slice(i, i + BATCH_SIZE));
+  // Build lookup map for fact metadata
+  const factsById = new Map(facts.map((f) => [f.id, f]));
+
+  // Group facts by city, then split large city groups into sub-batches
+  const byCity = new Map();
+  for (const f of facts) {
+    const key = f.city;
+    if (!byCity.has(key)) byCity.set(key, []);
+    byCity.get(key).push(f);
   }
-  console.log(`Processing ${batches.length} batches...\n`);
+
+  const batches = [];
+  for (const [, cityFacts] of byCity) {
+    for (let i = 0; i < cityFacts.length; i += BATCH_SIZE) {
+      batches.push(cityFacts.slice(i, i + BATCH_SIZE));
+    }
+  }
+  console.log(`Processing ${batches.length} city-grouped batches (${byCity.size} cities)...\n`);
 
   let totalGenerated = 0;
-  let totalUpdated = 0;
 
   const allQuestions = await processWithConcurrency(
     batches,
@@ -245,7 +350,9 @@ async function main() {
     CONCURRENCY
   );
 
-  console.log(`\nGenerated ${allQuestions.length} questions total.\n`);
+  const totalFacts = batches.reduce((sum, b) => sum + b.length, 0);
+  const skipped = totalFacts - allQuestions.length;
+  console.log(`\nGenerated ${allQuestions.length} questions from ${totalFacts} facts (${skipped} skipped as too obscure).\n`);
 
   if (!APPLY) {
     // Preview
@@ -264,13 +371,14 @@ async function main() {
     writeFileSync('scripts/preview-questions.json', JSON.stringify(allQuestions, null, 2));
     console.log('Full output saved to scripts/preview-questions.json');
   } else {
-    // Write to DB
-    console.log('Writing to database...');
-    for (const q of allQuestions) {
-      const ok = await updateRow(q);
-      if (ok) totalUpdated++;
-    }
-    console.log(`\nDone! Updated ${totalUpdated}/${allQuestions.length} rows.`);
+    // Save to JSON as backup (allows --upload if DB write fails)
+    writeFileSync('scripts/preview-questions.json', JSON.stringify(allQuestions, null, 2));
+    console.log('Saved to scripts/preview-questions.json');
+
+    // Write to quiz_questions table
+    console.log('Writing to quiz_questions table...');
+    const inserted = await writeQuestions(allQuestions, factsById);
+    console.log(`\nDone! Inserted ${inserted}/${allQuestions.length} rows into quiz_questions.`);
   }
 }
 
